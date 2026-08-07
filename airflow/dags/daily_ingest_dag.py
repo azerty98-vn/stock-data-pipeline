@@ -2,7 +2,7 @@
 
 Dependency design (Ngày 4 trong plan gốc):
   fetch_vn (N symbol, độc lập nhau)   \
-                                        > load_to_warehouse -> dbt_run_placeholder
+                                        > load_to_warehouse -> dbt_run -> dbt_test
   fetch_intl (N symbol, độc lập nhau) /
 
 - fetch_vn và fetch_intl chạy song song: 2 nguồn dữ liệu độc lập, không có
@@ -13,13 +13,17 @@ Dependency design (Ngày 4 trong plan gốc):
   riêng), vì nó load raw của cả 2 nguồn cùng lúc; dbt_run lại downstream của
   load_to_warehouse vì staging query trực tiếp trên bảng warehouse, không
   phải trên S3.
+- dbt_test tách riêng khỏi dbt_run (không gộp `dbt build`) để phân biệt rõ
+  2 loại thất bại trong Airflow UI: dbt_run fail = lỗi transform (SQL/schema
+  drift), dbt_test fail = business rule vi phạm dù transform chạy được —
+  hữu ích khi debug vì 2 nguyên nhân cần hướng điều tra khác nhau.
 - retry=2 + exponential backoff + alert_on_failure: lỗi fetch là lỗi "fail
   cứng" (xem ingestion/utils/alerts.py) vì downstream (moving average,
   volatility) cần đủ dữ liệu mới tính đúng.
 
-load_to_warehouse cần BQ_PROJECT/GOOGLE_APPLICATION_CREDENTIALS thật (GCP
-project đang được setup — xem .env.example) nên chưa chạy được ở thời điểm
-viết code này.
+load_to_warehouse, dbt_run, dbt_test cần BQ_PROJECT/GOOGLE_APPLICATION_CREDENTIALS
+thật (GCP project đang được setup — xem .env.example) nên chưa chạy được ở
+thời điểm viết code này.
 """
 
 from __future__ import annotations
@@ -27,10 +31,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
-from airflow.operators.empty import EmptyOperator
+from airflow.operators.bash import BashOperator
 
 from ingestion.config import INTL_SYMBOLS, VN_SYMBOLS
 from ingestion.utils.alerts import alert_on_failure
+
+DBT_PROJECT_DIR = "/opt/airflow/dbt_project"
 
 DEFAULT_ARGS = {
     "retries": 2,
@@ -80,15 +86,21 @@ def daily_ingest_dag():
             "yfinance": load_day_to_bigquery("yfinance", INTL_SYMBOLS, record_date),
         }
 
+    dbt_run = BashOperator(
+        task_id="dbt_run",
+        bash_command=f"dbt run --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR} --target dev",
+    )
+
+    dbt_test = BashOperator(
+        task_id="dbt_test",
+        bash_command=f"dbt test --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR} --target dev",
+    )
+
     vn_results = fetch_and_write_vn.expand(symbol=VN_SYMBOLS)
     intl_results = fetch_and_write_intl.expand(symbol=INTL_SYMBOLS)
     warehouse_result = load_to_warehouse()
 
-    # Placeholder: dbt project chưa tồn tại (sẽ thêm ở Bước 6-7). Giữ node
-    # này để dependency graph phản ánh đúng thiết kế cuối cùng ngay từ bây giờ.
-    dbt_run_placeholder = EmptyOperator(task_id="dbt_run_placeholder")
-
-    [vn_results, intl_results] >> warehouse_result >> dbt_run_placeholder
+    [vn_results, intl_results] >> warehouse_result >> dbt_run >> dbt_test
 
 
 daily_ingest_dag()

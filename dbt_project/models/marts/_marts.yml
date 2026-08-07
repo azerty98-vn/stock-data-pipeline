@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: fct_daily_returns
+    description: "Grain: 1 row = 1 symbol x 1 trading date. % thay đổi close so với ngày giao dịch trước."
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, date]
+
+  - name: fct_moving_averages
+    description: "Grain: 1 row = 1 symbol x 1 trading date. MA20/MA50 của close."
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, date]
+
+  - name: fct_volatility
+    description: "Grain: 1 row = 1 symbol x 1 trading date. Stddev 20 ngày của daily_return, quy đổi annualized."
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, date]
+
+  - name: fct_volume_anomaly
+    description: "Grain: 1 row = 1 symbol x 1 trading date. Flag volume > 2x trung bình 20 ngày trước đó."
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: is_volume_anomaly
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, date]

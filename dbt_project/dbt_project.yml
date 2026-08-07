@@ -16,6 +16,8 @@ models:
   stock_data_pipeline:
     staging:
       +materialized: view
+    intermediate:
+      +materialized: view
     marts:
       +materialized: incremental
       +incremental_strategy: merge

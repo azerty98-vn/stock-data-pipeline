@@ -17,6 +17,7 @@ x-airflow-common: &airflow-common
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./ingestion:/opt/airflow/ingestion
+    - ./dbt_project:/opt/airflow/dbt_project
     - airflow-logs:/opt/airflow/logs
     - airflow-plugins:/opt/airflow/plugins
   depends_on:
