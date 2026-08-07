@@ -1,7 +1,7 @@
 apache-airflow==2.9.3
 vnstock
 yfinance
-boto3
+google-cloud-storage
 pandas
 pyarrow
 pydantic>=2

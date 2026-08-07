@@ -8,16 +8,16 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-    S3_BUCKET: ${S3_BUCKET}
-    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-    AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
+    GCS_BUCKET: ${GCS_BUCKET}
+    GCS_LOCATION: ${GCS_LOCATION:-asia-southeast1}
     BQ_PROJECT: ${BQ_PROJECT:-}
     BQ_DATASET: ${BQ_DATASET:-stock_pipeline}
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/keys/bq-service-account.json
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./ingestion:/opt/airflow/ingestion
     - ./dbt_project:/opt/airflow/dbt_project
+    - ./keys:/opt/airflow/keys:ro
     - airflow-logs:/opt/airflow/logs
     - airflow-plugins:/opt/airflow/plugins
   depends_on:

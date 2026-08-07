@@ -12,7 +12,7 @@ Dependency design (Ngày 4 trong plan gốc):
 - load_to_warehouse là downstream của CẢ HAI nhóm (không phải từng cái
   riêng), vì nó load raw của cả 2 nguồn cùng lúc; dbt_run lại downstream của
   load_to_warehouse vì staging query trực tiếp trên bảng warehouse, không
-  phải trên S3.
+  phải trên GCS.
 - dbt_test tách riêng khỏi dbt_run (không gộp `dbt build`) để phân biệt rõ
   2 loại thất bại trong Airflow UI: dbt_run fail = lỗi transform (SQL/schema
   drift), dbt_test fail = business rule vi phạm dù transform chạy được —
@@ -59,7 +59,7 @@ def daily_ingest_dag():
     @task
     def fetch_and_write_vn(symbol: str, ds: str | None = None) -> str:
         from ingestion.fetch_vnstock import fetch_ohlcv
-        from ingestion.utils.s3_writer import write_records
+        from ingestion.utils.gcs_writer import write_records
 
         records = fetch_ohlcv(symbol, start=ds, end=ds)
         keys = write_records(records)
@@ -68,7 +68,7 @@ def daily_ingest_dag():
     @task
     def fetch_and_write_intl(symbol: str, ds: str | None = None) -> str:
         from ingestion.fetch_yfinance import fetch_ohlcv
-        from ingestion.utils.s3_writer import write_records
+        from ingestion.utils.gcs_writer import write_records
 
         records = fetch_ohlcv(symbol, start=ds, end=ds)
         keys = write_records(records)

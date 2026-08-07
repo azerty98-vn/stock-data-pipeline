@@ -1,6 +1,6 @@
 vnstock
 yfinance
-boto3
+google-cloud-storage
 pandas
 pyarrow
 pydantic>=2

@@ -1,13 +1,20 @@
-"""Load raw OHLCV từ S3 vào BigQuery.
+"""Load raw OHLCV từ GCS vào BigQuery.
 
-BigQuery external table trực tiếp trên S3 cần BigQuery Omni (paid, phức
-tạp cho side-project). Thay vào đó: đọc parquet từ S3 bằng boto3, load
-thẳng vào BigQuery bằng load job — đơn giản hơn, đủ dùng cho volume nhỏ.
+Raw storage và warehouse cùng nằm trên GCP nên BigQuery load job đọc thẳng
+`gs://` URI native — không cần đọc file về Python rồi upload lại qua
+pandas như khi raw layer nằm trên cloud khác (cross-cloud, không có
+external/load native).
 
-Idempotency: dùng partition decorator `table$YYYYMMDD` +
-WRITE_TRUNCATE — load lại cùng 1 ngày N lần luôn ghi đè đúng partition đó,
-không tạo duplicate và không đụng tới các ngày khác (partition-overwrite,
-cùng nguyên tắc với S3 writer ở raw layer).
+Idempotency: dùng partition decorator `table$YYYYMMDD` + WRITE_TRUNCATE —
+load lại cùng 1 ngày N lần luôn ghi đè đúng partition đó, không tạo
+duplicate và không đụng tới các ngày khác (partition-overwrite, cùng
+nguyên tắc với GCS writer ở raw layer).
+
+Schema truyền tường minh vào job_config (thay vì để BigQuery auto-detect
+từ parquet) để load fail ngay nếu raw parquet có cột lệch contract — cùng
+nguyên tắc fail-fast với validate_ohlcv() ở ingestion layer, chỉ khác điểm
+kiểm tra (đây là lớp phòng thủ thứ 2, phòng trường hợp parquet trên GCS bị
+ghi sai bởi 1 phiên bản code cũ).
 
 GCP project chưa setup ở thời điểm viết code này — BQ_PROJECT/
 GOOGLE_APPLICATION_CREDENTIALS là placeholder trong .env.example, cần điền
@@ -16,14 +23,11 @@ giá trị thật trước khi task này chạy được.
 
 from __future__ import annotations
 
-import io
 import logging
 import os
 from datetime import date
 
-import pandas as pd
-
-from ingestion.utils.s3_writer import object_key
+from ingestion.utils.gcs_writer import blob_path
 
 logger = logging.getLogger(__name__)
 
@@ -41,54 +45,47 @@ BQ_SCHEMA = [
 ]
 
 
-def _read_parquet_from_s3(bucket: str, key: str, s3_client) -> pd.DataFrame | None:
-    try:
-        obj = s3_client.get_object(Bucket=bucket, Key=key)
-    except s3_client.exceptions.NoSuchKey:
-        return None
-    return pd.read_parquet(io.BytesIO(obj["Body"].read()))
-
-
 def load_day_to_bigquery(source: str, symbols: list[str], record_date: date) -> int:
-    """Đọc raw/{source}/{symbol}/{date}.parquet cho từng symbol, load vào
-    BigQuery raw_ohlcv$YYYYMMDD (WRITE_TRUNCATE — overwrite đúng partition).
+    """Load raw/{source}/{symbol}/{date}.parquet (mỗi symbol 1 file trên GCS)
+    vào BigQuery raw_ohlcv$YYYYMMDD (WRITE_TRUNCATE — overwrite đúng partition).
 
-    Trả về số row đã load. Trả về 0 nếu không có symbol nào có data cho ngày đó
-    (vd: ngày nghỉ lễ) — caller quyết định đây có phải lỗi hay không.
+    Trả về số row trong partition sau khi load. Trả về 0 nếu không symbol nào
+    có data cho ngày đó (vd: ngày nghỉ lễ) — caller quyết định đây có phải
+    lỗi hay không.
     """
-    from google.cloud import bigquery
+    from google.cloud import bigquery, storage
 
-    from ingestion.utils.s3_writer import _s3_client
+    bucket_name = os.environ["GCS_BUCKET"]
+    project = os.environ["BQ_PROJECT"]
+    dataset = os.environ.get("BQ_DATASET", "stock_pipeline")
 
-    bucket = os.environ["S3_BUCKET"]
-    s3_client = _s3_client()
+    gcs_client = storage.Client(project=project)
+    bucket = gcs_client.bucket(bucket_name)
 
-    frames = []
+    uris = []
     for symbol in symbols:
-        key = object_key(source, symbol, record_date)
-        df = _read_parquet_from_s3(bucket, key, s3_client)
-        if df is not None:
-            frames.append(df)
+        path = blob_path(source, symbol, record_date)
+        if bucket.blob(path).exists():
+            uris.append(f"gs://{bucket_name}/{path}")
         else:
             logger.warning("No raw object for %s/%s on %s (holiday/delist?)", source, symbol, record_date)
 
-    if not frames:
+    if not uris:
         return 0
 
-    combined = pd.concat(frames, ignore_index=True)
-
-    project = os.environ["BQ_PROJECT"]
-    dataset = os.environ.get("BQ_DATASET", "stock_pipeline")
     partition = record_date.strftime("%Y%m%d")
     table_id = f"{project}.{dataset}.{RAW_TABLE}${partition}"
 
     bq_client = bigquery.Client(project=project)
     job_config = bigquery.LoadJobConfig(
+        source_format=bigquery.SourceFormat.PARQUET,
         schema=[bigquery.SchemaField(**f) for f in BQ_SCHEMA],
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
         time_partitioning=bigquery.TimePartitioning(field="date"),
     )
-    job = bq_client.load_table_from_dataframe(combined, table_id, job_config=job_config)
+    job = bq_client.load_table_from_uri(uris, table_id, job_config=job_config)
     job.result()
-    logger.info("Loaded %d row(s) into %s", len(combined), table_id)
-    return len(combined)
+
+    table = bq_client.get_table(table_id)
+    logger.info("Loaded partition %s into %s (%d row total)", partition, table_id, table.num_rows)
+    return table.num_rows
