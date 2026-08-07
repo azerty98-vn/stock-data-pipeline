@@ -1,0 +1,11 @@
+apache-airflow==2.9.3
+vnstock
+yfinance
+boto3
+pandas
+pyarrow
+pydantic>=2
+great-expectations
+dbt-core
+dbt-bigquery
+ruff

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/webserver_config.py
+airflow/standalone_admin_password.txt
+
+# dbt
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/
+
+# Great Expectations
+great_expectations/uncommitted/
+
+# Dashboard
+dashboard/node_modules/
+dashboard/.svelte-kit/
+dashboard/build/
+
+# Data (local dev artifacts — MinIO volume, parquet dumps)
+data/
+*.parquet
+*.duckdb
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
