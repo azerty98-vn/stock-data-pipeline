@@ -6,6 +6,7 @@ pandas
 pyarrow
 pydantic>=2
 great-expectations
+requests
 dbt-core
 dbt-bigquery
 ruff

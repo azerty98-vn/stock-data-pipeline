@@ -5,3 +5,4 @@ pandas
 pyarrow
 pydantic>=2
 great-expectations
+requests
