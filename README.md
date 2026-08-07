@@ -51,11 +51,14 @@ Toàn bộ pipeline trên được orchestration/dags/daily_ingest_dag.py (Airfl
 stock-data-pipeline/
 ├── orchestration/          # Airflow: điều phối toàn bộ pipeline
 │   ├── Dockerfile
-│   └── dags/daily_ingest_dag.py
+│   └── dags/
+│       ├── daily_ingest_dag.py    # chạy theo lịch (E-V-L-T mỗi ngày)
+│       └── backfill_dag.py        # trigger thủ công, seed/sửa lịch sử
 ├── pipeline/
 │   ├── extract/            # E: gọi API nguồn, trả về data đã validate
 │   ├── load/                # L: ghi raw -> GCS, raw -> BigQuery
 │   ├── contracts/           # Data contract dùng chung cho extract layer
+│   ├── backfill.py          # backfill lịch sử theo batch date-range
 │   ├── alerts.py
 │   └── config.py            # Danh sách symbol theo dõi
 ├── transform/                # T: dbt project (staging -> intermediate -> marts)
