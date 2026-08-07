@@ -11,20 +11,20 @@ venv/
 # GCP service account key
 keys/
 
-# Airflow
-airflow/logs/
-airflow/airflow.db
-airflow/airflow.cfg
-airflow/webserver_config.py
-airflow/standalone_admin_password.txt
+# Airflow (orchestration/)
+orchestration/logs/
+orchestration/airflow.db
+orchestration/airflow.cfg
+orchestration/webserver_config.py
+orchestration/standalone_admin_password.txt
 
-# dbt
-dbt_project/target/
-dbt_project/dbt_packages/
-dbt_project/logs/
+# dbt (transform/)
+transform/target/
+transform/dbt_packages/
+transform/logs/
 
-# Great Expectations
-great_expectations/uncommitted/
+# Great Expectations (quality/)
+quality/uncommitted/
 
 # Dashboard
 dashboard/node_modules/

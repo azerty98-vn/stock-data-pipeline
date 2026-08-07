@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: raw
-    description: "Raw layer, load bởi ingestion/utils/bq_loader.py (Bước 5)"
+    description: "Raw layer, load bởi pipeline/load/bq_loader.py (Bước 5)"
     database: "{{ env_var('BQ_PROJECT', 'placeholder-project') }}"
     schema: "{{ env_var('BQ_DATASET', 'stock_pipeline') }}"
     tables:

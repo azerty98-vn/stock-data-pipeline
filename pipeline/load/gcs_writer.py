@@ -23,7 +23,7 @@ from datetime import date
 
 import pandas as pd
 
-from ingestion.utils.schema import OhlcvRecord
+from pipeline.contracts.schema import OhlcvRecord
 
 logger = logging.getLogger(__name__)
 

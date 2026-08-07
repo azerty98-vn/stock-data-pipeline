@@ -1,8 +1,9 @@
-"""Fetch daily OHLCV cho mã VN qua vnstock, validate theo data contract.
+"""Fetch daily OHLCV cho mã quốc tế qua yfinance, validate theo data contract.
 
-Fail-fast: nếu vnstock đổi tên cột/format response, validate_ohlcv() raise
-ngay tại đây (ValidationError liệt kê rõ symbol/date/field lỗi) thay vì để
-dữ liệu sai âm thầm trôi xuống staging.
+Cùng contract (pipeline.contracts.schema.OhlcvRecord) với fetch_vnstock.py —
+2 nguồn khác nhau nhưng phải hội tụ về cùng 1 grain (symbol, date) trước khi
+ghi raw layer, để staging layer union được 2 nguồn mà không cần biết chi
+tiết API gốc.
 """
 
 from __future__ import annotations
@@ -15,31 +16,30 @@ from datetime import date
 import pandas as pd
 from pydantic import ValidationError
 
-from ingestion.utils.schema import OhlcvRecord
+from pipeline.contracts.schema import OhlcvRecord
 
 logger = logging.getLogger(__name__)
 
-SOURCE = "vnstock"
+SOURCE = "yfinance"
 
-# Tên cột vnstock trả về (source="VCI", quote.history) -> tên cột trong contract
 COLUMN_MAP = {
-    "time": "date",
-    "open": "open",
-    "high": "high",
-    "low": "low",
-    "close": "close",
-    "volume": "volume",
+    "Open": "open",
+    "High": "high",
+    "Low": "low",
+    "Close": "close",
+    "Volume": "volume",
 }
 
 
 def fetch_raw(symbol: str, start: str, end: str) -> pd.DataFrame:
-    """Gọi vnstock, trả về DataFrame thô (chưa validate)."""
-    from vnstock import Vnstock
+    """Gọi yfinance, trả về DataFrame thô (chưa validate)."""
+    import yfinance as yf
 
-    stock = Vnstock().stock(symbol=symbol, source="VCI")
-    df = stock.quote.history(start=start, end=end, interval="1D")
+    df = yf.download(symbol, start=start, end=end, interval="1d", progress=False, auto_adjust=False)
     if df is None or df.empty:
-        raise ValueError(f"vnstock trả về rỗng cho symbol={symbol} [{start}..{end}]")
+        raise ValueError(f"yfinance trả về rỗng cho symbol={symbol} [{start}..{end}]")
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
     return df
 
 
@@ -48,16 +48,18 @@ def validate_ohlcv(symbol: str, raw_df: pd.DataFrame) -> list[OhlcvRecord]:
     missing = set(COLUMN_MAP) - set(raw_df.columns)
     if missing:
         raise ValueError(
-            f"vnstock schema đã đổi cho symbol={symbol}: thiếu cột {missing}. "
+            f"yfinance schema đã đổi cho symbol={symbol}: thiếu cột {missing}. "
             f"Cột hiện có: {list(raw_df.columns)}"
         )
 
-    df = raw_df.rename(columns=COLUMN_MAP)
+    df = raw_df.rename(columns=COLUMN_MAP).reset_index()
+    date_col = "Date" if "Date" in df.columns else df.columns[0]
+
     records: list[OhlcvRecord] = []
     errors: list[str] = []
     for _, row in df.iterrows():
         try:
-            row_date = pd.to_datetime(row["date"]).date()
+            row_date = pd.to_datetime(row[date_col]).date()
             records.append(
                 OhlcvRecord(
                     source=SOURCE,
@@ -71,7 +73,7 @@ def validate_ohlcv(symbol: str, raw_df: pd.DataFrame) -> list[OhlcvRecord]:
                 )
             )
         except (ValidationError, ValueError, TypeError) as exc:
-            errors.append(f"{symbol} {row.get('date')}: {exc}")
+            errors.append(f"{symbol} {row.get(date_col)}: {exc}")
 
     if errors:
         raise ValueError(
@@ -88,8 +90,8 @@ def fetch_ohlcv(symbol: str, start: str, end: str) -> list[OhlcvRecord]:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    parser = argparse.ArgumentParser(description="Fetch VN OHLCV qua vnstock, validate contract")
-    parser.add_argument("--symbols", nargs="+", required=True, help="vd: VNM FPT HPG")
+    parser = argparse.ArgumentParser(description="Fetch international OHLCV qua yfinance, validate contract")
+    parser.add_argument("--symbols", nargs="+", required=True, help="vd: AAPL MSFT")
     parser.add_argument("--start", default=str(date.today().replace(day=1)))
     parser.add_argument("--end", default=str(date.today()))
     args = parser.parse_args()

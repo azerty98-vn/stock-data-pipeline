@@ -1,22 +1,26 @@
 x-airflow-common: &airflow-common
   build:
     context: .
-    dockerfile: airflow/Dockerfile
+    dockerfile: orchestration/Dockerfile
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@postgres/${AIRFLOW_DB_NAME:-airflow}
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    # pipeline/ (extract, load, contracts) không nằm trong dags/ nên cần
+    # thêm /opt/airflow vào PYTHONPATH để `from pipeline.xxx import ...`
+    # trong DAG import được.
+    PYTHONPATH: /opt/airflow
     GCS_BUCKET: ${GCS_BUCKET}
     GCS_LOCATION: ${GCS_LOCATION:-asia-southeast1}
     BQ_PROJECT: ${BQ_PROJECT:-}
     BQ_DATASET: ${BQ_DATASET:-stock_pipeline}
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/keys/bq-service-account.json
   volumes:
-    - ./airflow/dags:/opt/airflow/dags
-    - ./ingestion:/opt/airflow/ingestion
-    - ./dbt_project:/opt/airflow/dbt_project
+    - ./orchestration/dags:/opt/airflow/dags
+    - ./pipeline:/opt/airflow/pipeline
+    - ./transform:/opt/airflow/transform
     - ./keys:/opt/airflow/keys:ro
     - airflow-logs:/opt/airflow/logs
     - airflow-plugins:/opt/airflow/plugins

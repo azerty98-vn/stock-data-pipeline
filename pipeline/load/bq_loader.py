@@ -12,7 +12,7 @@ nguyên tắc với GCS writer ở raw layer).
 
 Schema truyền tường minh vào job_config (thay vì để BigQuery auto-detect
 từ parquet) để load fail ngay nếu raw parquet có cột lệch contract — cùng
-nguyên tắc fail-fast với validate_ohlcv() ở ingestion layer, chỉ khác điểm
+nguyên tắc fail-fast với validate_ohlcv() ở extract layer, chỉ khác điểm
 kiểm tra (đây là lớp phòng thủ thứ 2, phòng trường hợp parquet trên GCS bị
 ghi sai bởi 1 phiên bản code cũ).
 
@@ -27,7 +27,7 @@ import logging
 import os
 from datetime import date
 
-from ingestion.utils.gcs_writer import blob_path
+from pipeline.load.gcs_writer import blob_path
 
 logger = logging.getLogger(__name__)
 

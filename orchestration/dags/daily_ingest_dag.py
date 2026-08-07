@@ -1,4 +1,9 @@
-"""Daily ingest DAG.
+"""Daily ingest DAG — điều phối toàn bộ pipeline ELT.
+
+Pipeline stage -> code:
+  Extract  (pipeline/extract/)   : gọi API nguồn, validate contract
+  Load     (pipeline/load/)      : ghi raw -> GCS, raw -> BigQuery
+  Transform (transform/, dbt)    : staging -> intermediate -> marts
 
 Dependency design (Ngày 4 trong plan gốc):
   fetch_vn (N symbol, độc lập nhau)   \
@@ -18,8 +23,8 @@ Dependency design (Ngày 4 trong plan gốc):
   drift), dbt_test fail = business rule vi phạm dù transform chạy được —
   hữu ích khi debug vì 2 nguyên nhân cần hướng điều tra khác nhau.
 - retry=2 + exponential backoff + alert_on_failure: lỗi fetch là lỗi "fail
-  cứng" (xem ingestion/utils/alerts.py) vì downstream (moving average,
-  volatility) cần đủ dữ liệu mới tính đúng.
+  cứng" (xem pipeline/alerts.py) vì downstream (moving average, volatility)
+  cần đủ dữ liệu mới tính đúng.
 
 load_to_warehouse, dbt_run, dbt_test cần BQ_PROJECT/GOOGLE_APPLICATION_CREDENTIALS
 thật (GCP project đang được setup — xem .env.example) nên chưa chạy được ở
@@ -33,10 +38,10 @@ from datetime import datetime, timedelta
 from airflow.decorators import dag, task
 from airflow.operators.bash import BashOperator
 
-from ingestion.config import INTL_SYMBOLS, VN_SYMBOLS
-from ingestion.utils.alerts import alert_on_failure
+from pipeline.alerts import alert_on_failure
+from pipeline.config import INTL_SYMBOLS, VN_SYMBOLS
 
-DBT_PROJECT_DIR = "/opt/airflow/dbt_project"
+TRANSFORM_PROJECT_DIR = "/opt/airflow/transform"
 
 DEFAULT_ARGS = {
     "retries": 2,
@@ -58,8 +63,8 @@ DEFAULT_ARGS = {
 def daily_ingest_dag():
     @task
     def fetch_and_write_vn(symbol: str, ds: str | None = None) -> str:
-        from ingestion.fetch_vnstock import fetch_ohlcv
-        from ingestion.utils.gcs_writer import write_records
+        from pipeline.extract.fetch_vnstock import fetch_ohlcv
+        from pipeline.load.gcs_writer import write_records
 
         records = fetch_ohlcv(symbol, start=ds, end=ds)
         keys = write_records(records)
@@ -67,8 +72,8 @@ def daily_ingest_dag():
 
     @task
     def fetch_and_write_intl(symbol: str, ds: str | None = None) -> str:
-        from ingestion.fetch_yfinance import fetch_ohlcv
-        from ingestion.utils.gcs_writer import write_records
+        from pipeline.extract.fetch_yfinance import fetch_ohlcv
+        from pipeline.load.gcs_writer import write_records
 
         records = fetch_ohlcv(symbol, start=ds, end=ds)
         keys = write_records(records)
@@ -78,7 +83,7 @@ def daily_ingest_dag():
     def load_to_warehouse(ds: str | None = None) -> dict[str, int]:
         from datetime import date as date_cls
 
-        from ingestion.utils.bq_loader import load_day_to_bigquery
+        from pipeline.load.bq_loader import load_day_to_bigquery
 
         record_date = date_cls.fromisoformat(ds)
         return {
@@ -88,12 +93,12 @@ def daily_ingest_dag():
 
     dbt_run = BashOperator(
         task_id="dbt_run",
-        bash_command=f"dbt run --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR} --target dev",
+        bash_command=f"dbt run --project-dir {TRANSFORM_PROJECT_DIR} --profiles-dir {TRANSFORM_PROJECT_DIR} --target dev",
     )
 
     dbt_test = BashOperator(
         task_id="dbt_test",
-        bash_command=f"dbt test --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR} --target dev",
+        bash_command=f"dbt test --project-dir {TRANSFORM_PROJECT_DIR} --profiles-dir {TRANSFORM_PROJECT_DIR} --target dev",
     )
 
     vn_results = fetch_and_write_vn.expand(symbol=VN_SYMBOLS)

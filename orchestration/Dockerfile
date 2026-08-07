@@ -8,7 +8,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 USER airflow
-COPY airflow/requirements.txt /tmp/requirements.txt
+COPY orchestration/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --constraint \
     "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-3.11.txt" \
     -r /tmp/requirements.txt
