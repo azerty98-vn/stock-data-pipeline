@@ -73,3 +73,7 @@ stock-data-pipeline/
 ├── docs/                     # Quyết định thiết kế (grain, idempotency, error handling...)
 └── docker-compose.yml
 ```
+
+## Quyết định thiết kế
+
+Grain/contract từng layer, chiến lược idempotency/backfill, cách phân loại và xử lý lỗi, lý do dependency của DAG — xem [`docs/data_model.md`](docs/data_model.md).
