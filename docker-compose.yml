@@ -71,7 +71,22 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  metabase:
+    # Kết nối BigQuery cấu hình qua UI Metabase (upload cùng service-account
+    # json ở ./keys, đã mount sẵn), không qua env var — Metabase không có
+    # cách khai báo datasource qua env cho BigQuery. H2 file embedded đủ
+    # cho quy mô side-project, không cần thêm Postgres riêng cho Metabase.
+    image: metabase/metabase:latest
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+    volumes:
+      - metabase-data:/metabase-data
+      - ./keys:/keys:ro
+    ports:
+      - "3000:3000"
+
 volumes:
   postgres-db:
   airflow-logs:
   airflow-plugins:
+  metabase-data:

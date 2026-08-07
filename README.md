@@ -39,10 +39,16 @@ End-to-end ELT pipeline cho dữ liệu OHLCV (VN qua vnstock, quốc tế qua y
                     │  transform/models/marts/      (incremental, merge)   │
                     │  -> fct_daily_returns, fct_moving_averages,          │
                     │     fct_volatility, fct_volume_anomaly               │
+                    └──────────────────────┬───────────────────────────-──┘
+                                            v
+                    ┌────────────────── DASHBOARD ──────────────────────-──┐
+                    │  Metabase, kết nối trực tiếp BigQuery, đọc marts     │
+                    │  (xem dashboard/README.md)                          │
                     └──────────────────────────────────────────────────────┘
 
 Toàn bộ pipeline trên được orchestration/dags/daily_ingest_dag.py (Airflow)
-điều phối theo lịch hàng ngày.
+điều phối theo lịch hàng ngày. pipeline/backfill.py (qua backfill_dag.py)
+seed/sửa lịch sử khi cần, chạy độc lập với lịch hàng ngày.
 ```
 
 ## Cấu trúc repo
