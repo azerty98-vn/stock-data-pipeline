@@ -53,16 +53,3 @@ stock-data-pipeline/
 ├── docs/                     # Quyết định thiết kế (grain, idempotency, error handling...)
 └── docker-compose.yml
 ```
-
-## Chạy local
-
-```bash
-cp .env.example .env   # điền GCS_BUCKET, BQ_PROJECT; đặt service account json tại keys/bq-service-account.json
-docker compose up --build
-```
-
-Airflow UI: http://localhost:8080 (admin/admin — đổi mật khẩu sau khi chạy).
-
-## Trạng thái
-
-Xem lịch sử commit — mỗi commit tương ứng 1 bước trong pipeline (extract → load → transform → orchestration), kèm lý do trade-off trong message.
