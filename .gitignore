@@ -37,3 +37,6 @@ data/
 .DS_Store
 .vscode/
 .idea/
+
+# Ghi chú cá nhân — không đưa vào repo public
+stock-data-pipeline-plan.md
