@@ -1,6 +1,6 @@
 # Stock Data Pipeline
 
-End-to-end ELT pipeline cho dữ liệu OHLCV (VN qua vnstock, quốc tế qua yfinance): Airflow điều phối extract → load raw → load warehouse → transform (dbt).
+End-to-end ELT pipeline cho dữ liệu OHLCV (VN qua vnstock, quốc tế qua yfinance): Airflow điều phối extract → load raw → validate (Great Expectations) → load warehouse → transform (dbt).
 
 ## Luồng dữ liệu
 
@@ -8,21 +8,30 @@ End-to-end ELT pipeline cho dữ liệu OHLCV (VN qua vnstock, quốc tế qua y
                     ┌────────────────────── EXTRACT ──────────────────────┐
                     │  pipeline/extract/fetch_vnstock.py                   │
                     │  pipeline/extract/fetch_yfinance.py                  │
-                    │  -> validate theo pipeline/contracts/schema.py       │
-                    │     (fail-fast nếu API đổi format)                   │
+                    │  -> validate từng row theo pipeline/contracts/       │
+                    │     schema.py (fail-fast nếu API đổi format)         │
                     └──────────────────────┬────────────────────────────-─┘
                                             v
-                    ┌─────────────────────── LOAD ─────────────────────────┐
+                    ┌──────────────────── LOAD (raw) ──────────────────────┐
                     │  pipeline/load/gcs_writer.py                         │
                     │  -> raw/{source}/{symbol}/{date}.parquet trên GCS    │
                     │     (idempotent: overwrite theo key)                 │
-                    │                                                      │
+                    └──────────────────────┬────────────────────────────-─┘
+                                            v
+                    ┌───────────────────── VALIDATE ───────────────────────┐
+                    │  quality/validate_raw.py (Great Expectations)        │
+                    │  -> validate CẢ BATCH (N symbol/ngày) vừa ghi trên   │
+                    │     GCS, TRƯỚC khi load vào warehouse                │
+                    └──────────────────────┬────────────────────────────-─┘
+                                            v
+                    ┌────────────────── LOAD (warehouse) ──────────────────┐
                     │  pipeline/load/bq_loader.py                          │
                     │  -> BigQuery raw_ohlcv$YYYYMMDD                      │
                     │     (idempotent: WRITE_TRUNCATE theo partition)      │
                     └──────────────────────┬───────────────────────────-──┘
                                             v
                     ┌───────────────────TRANSFORM (dbt) ───────────────────┐
+                    │  dbt source freshness (data đã "tới" chưa)           │
                     │  transform/models/staging/    (view, full refresh)   │
                     │  transform/models/intermediate/ (union VN + intl)    │
                     │  transform/models/marts/      (incremental, merge)   │

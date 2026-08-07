@@ -4,7 +4,7 @@ google-cloud-storage
 pandas
 pyarrow
 pydantic>=2
-great-expectations
+great-expectations>=0.18,<0.19
 requests
 google-cloud-bigquery
 db-dtypes

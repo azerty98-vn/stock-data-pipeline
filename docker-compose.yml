@@ -20,6 +20,7 @@ x-airflow-common: &airflow-common
   volumes:
     - ./orchestration/dags:/opt/airflow/dags
     - ./pipeline:/opt/airflow/pipeline
+    - ./quality:/opt/airflow/quality
     - ./transform:/opt/airflow/transform
     - ./keys:/opt/airflow/keys:ro
     - airflow-logs:/opt/airflow/logs
