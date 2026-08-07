@@ -28,7 +28,7 @@ dashboard/node_modules/
 dashboard/.svelte-kit/
 dashboard/build/
 
-# Data (local dev artifacts — MinIO volume, parquet dumps)
+# Data (local dev artifacts — parquet dumps)
 data/
 *.parquet
 *.duckdb

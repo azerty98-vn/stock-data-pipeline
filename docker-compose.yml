@@ -8,10 +8,10 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-    S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
-    S3_BUCKET: ${S3_BUCKET:-stock-raw}
-    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+    S3_BUCKET: ${S3_BUCKET}
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
     BQ_PROJECT: ${BQ_PROJECT:-}
     BQ_DATASET: ${BQ_DATASET:-stock_pipeline}
   volumes:
@@ -66,24 +66,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
-    ports:
-      - "9000:9000"   # S3 API — cùng cổng dùng cho S3_ENDPOINT_URL
-      - "9001:9001"   # web console
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      retries: 5
-
 volumes:
   postgres-db:
   airflow-logs:
   airflow-plugins:
-  minio-data:

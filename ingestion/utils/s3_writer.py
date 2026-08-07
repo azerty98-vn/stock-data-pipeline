@@ -1,4 +1,4 @@
-"""Ghi raw OHLCV records lên S3 (hoặc MinIO local) với key idempotent.
+"""Ghi raw OHLCV records lên AWS S3 với key idempotent.
 
 Idempotency strategy: mỗi (source, symbol, date) map 1:1 sang 1 object key
 `raw/{source}/{symbol}/{date}.parquet`. Ghi = overwrite theo key (S3
@@ -6,9 +6,6 @@ PutObject vốn đã overwrite nếu key trùng), nên chạy lại DAG của c�
 N lần luôn cho cùng 1 kết quả — không cần transaction/dedupe ở raw layer.
 Merge/upsert theo grain (symbol, date) được để lại cho dbt xử lý ở staging,
 vì raw layer chỉ là bản chụp thô, không phải bảng có PK cần merge.
-
-Local dev trỏ S3_ENDPOINT_URL vào MinIO; khi có AWS account thật, chỉ cần
-đổi biến môi trường (bỏ S3_ENDPOINT_URL hoặc trỏ endpoint AWS), code không đổi.
 """
 
 from __future__ import annotations
@@ -28,12 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 def _s3_client():
-    endpoint_url = os.environ.get("S3_ENDPOINT_URL") or None
     return boto3.client(
         "s3",
-        endpoint_url=endpoint_url,
         aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
         aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1"),
     )
 
 
@@ -43,10 +39,14 @@ def object_key(source: str, symbol: str, record_date: date) -> str:
 
 def ensure_bucket(bucket: str, client=None) -> None:
     client = client or _s3_client()
+    region = os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1")
     try:
         client.head_bucket(Bucket=bucket)
     except Exception:
-        client.create_bucket(Bucket=bucket)
+        create_kwargs = {"Bucket": bucket}
+        if region != "us-east-1":
+            create_kwargs["CreateBucketConfiguration"] = {"LocationConstraint": region}
+        client.create_bucket(**create_kwargs)
 
 
 def write_records(records: list[OhlcvRecord], bucket: str | None = None, client=None) -> list[str]:
