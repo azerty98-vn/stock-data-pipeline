@@ -1,0 +1,7 @@
+vnstock
+yfinance
+boto3
+pandas
+pyarrow
+pydantic>=2
+great-expectations
