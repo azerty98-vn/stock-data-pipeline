@@ -6,3 +6,5 @@ pyarrow
 pydantic>=2
 great-expectations
 requests
+google-cloud-bigquery
+db-dtypes
