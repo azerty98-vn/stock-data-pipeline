@@ -1,5 +1,7 @@
 # Stock Data Pipeline
 
+[![CI](https://github.com/azerty98-vn/stock-data-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/azerty98-vn/stock-data-pipeline/actions/workflows/ci.yml)
+
 End-to-end ELT pipeline cho dữ liệu OHLCV (VN qua vnstock, quốc tế qua yfinance): Airflow điều phối extract → load raw → validate (Great Expectations) → load warehouse → transform (dbt).
 
 ## Luồng dữ liệu

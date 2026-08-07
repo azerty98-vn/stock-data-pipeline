@@ -21,3 +21,14 @@ models:
     marts:
       +materialized: incremental
       +incremental_strategy: merge
+
+seeds:
+  stock_data_pipeline:
+    raw_ohlcv:
+      # dbt seed auto-infer sẽ đoán `date` là STRING (BigQuery) nếu không
+      # ép kiểu tường minh — ép DATE để khớp source('raw','raw_ohlcv') mà
+      # staging models kỳ vọng. Seed load vào dataset của TARGET đang active
+      # (xem models/staging/_sources.yml dùng target.schema) — chạy
+      # `dbt seed --target ci` sẽ vào dataset CI riêng, không đụng dev/prod.
+      +column_types:
+        date: date

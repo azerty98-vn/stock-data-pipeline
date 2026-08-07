@@ -4,7 +4,10 @@ sources:
   - name: raw
     description: "Raw layer, load bởi pipeline/load/bq_loader.py (Bước 5)"
     database: "{{ env_var('BQ_PROJECT', 'placeholder-project') }}"
-    schema: "{{ env_var('BQ_DATASET', 'stock_pipeline') }}"
+    # target.schema thay vì env_var riêng: dataset tự đổi theo target đang
+    # active trong profiles.yml (dev -> BQ_DATASET, ci -> BQ_DATASET_CI),
+    # nên `dbt run --target ci` không vô tình đọc nhầm dataset dev/prod.
+    schema: "{{ target.schema }}"
     tables:
       - name: raw_ohlcv
         description: >

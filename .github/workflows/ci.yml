@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - run: ruff check pipeline quality orchestration/dags
+
+  dbt-test:
+    runs-on: ubuntu-latest
+    # Chạy trên dataset `ci` riêng (BQ_DATASET_CI), không đụng dataset
+    # dev/prod. Dùng seed cố định (transform/seeds/raw_ohlcv.csv) thay vì
+    # gọi vnstock/yfinance thật — API bên thứ 3 không ổn định/rate-limit
+    # trong CI, và mục tiêu của job này là bắt lỗi SQL/schema drift ở
+    # transform layer, không phải test lại toàn bộ pipeline E2E.
+    env:
+      BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
+      BQ_DATASET_CI: ${{ secrets.BQ_DATASET_CI }}
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install "dbt-core" "dbt-bigquery"
+      - name: Write GCP service-account key
+        run: echo '${{ secrets.GCP_SA_KEY }}' > gcp-key.json
+      - name: dbt deps
+        run: dbt deps --project-dir transform --profiles-dir transform
+      - name: dbt seed (fixture data cho CI)
+        run: dbt seed --project-dir transform --profiles-dir transform --target ci
+      - name: dbt run
+        run: dbt run --project-dir transform --profiles-dir transform --target ci
+      - name: dbt test
+        run: dbt test --project-dir transform --profiles-dir transform --target ci
+      - name: Clean up key
+        if: always()
+        run: rm -f gcp-key.json
