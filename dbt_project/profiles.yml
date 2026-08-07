@@ -1,0 +1,24 @@
+# Không chứa secret — mọi giá trị lấy từ env var. Chạy dbt với
+# DBT_PROFILES_DIR=dbt_project (hoặc `dbt --profiles-dir dbt_project`).
+# `ci` target dùng dataset riêng để CI không đụng vào dữ liệu dev/prod
+# (xem Bước 9 trong plan).
+stock_data_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('BQ_PROJECT') }}"
+      dataset: "{{ env_var('BQ_DATASET', 'stock_pipeline') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+      threads: 4
+      location: US
+
+    ci:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('BQ_PROJECT') }}"
+      dataset: "{{ env_var('BQ_DATASET_CI', 'stock_pipeline_ci') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+      threads: 4
+      location: US

@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_ohlcv_vn
+    description: "Grain: 1 row = 1 symbol x 1 trading date (VN, vnstock)"
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: close
+        tests:
+          - not_null
+          # Bắt bug "giá <= 0" (API trả lỗi/null coerce về 0) — khác loại
+          # bug với test unique bên dưới (bắt duplicate load, không bắt giá sai).
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: false
+    tests:
+      # Bắt bug "load 2 lần cho cùng 1 ngày" hoặc "raw layer không idempotent
+      # như kỳ vọng" — khác loại bug với test giá > 0 ở trên.
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, date]
+
+  - name: stg_ohlcv_intl
+    description: "Grain: 1 row = 1 symbol x 1 trading date (quốc tế, yfinance)"
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: close
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: false
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, date]

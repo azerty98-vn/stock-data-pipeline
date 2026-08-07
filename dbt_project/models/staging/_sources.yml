@@ -1,0 +1,29 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Raw layer, load bởi ingestion/utils/bq_loader.py (Bước 5)"
+    database: "{{ env_var('BQ_PROJECT', 'placeholder-project') }}"
+    schema: "{{ env_var('BQ_DATASET', 'stock_pipeline') }}"
+    tables:
+      - name: raw_ohlcv
+        description: >
+          Grain: 1 row = 1 symbol x 1 trading date. Partitioned theo `date`,
+          mỗi partition được WRITE_TRUNCATE nguyên khối khi load lại (idempotent
+          — xem bq_loader.py), nên KHÔNG kỳ vọng duplicate trong 1 partition.
+        loaded_at_field: date
+        freshness:
+          # "Chưa tới" (freshness fail -> warn) khác "tới nhưng sai" (dbt test
+          # fail -> block). 30h vì thị trường không giao dịch cuối tuần: sáng
+          # thứ 2 kiểm tra data thứ 6 đã hơn 24h nhưng vẫn hợp lệ.
+          warn_after: { count: 30, period: hour }
+          error_after: { count: 54, period: hour }
+        columns:
+          - name: source
+          - name: symbol
+          - name: date
+          - name: open
+          - name: high
+          - name: low
+          - name: close
+          - name: volume
